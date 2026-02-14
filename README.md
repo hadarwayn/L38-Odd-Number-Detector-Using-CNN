@@ -139,11 +139,11 @@ Each filter produces a **feature map** - a new image that shows where a specific
 
 ## Video: Demystifying the CNN
 
-For a visual walkthrough of how CNNs work, watch this video:
+For a visual walkthrough of how CNNs work, download and watch the video:
 
-https://github.com/user-attachments/assets/placeholder
+[Demystifying the CNN (MP4)](References/Demystifying_the_CNN.mp4)
 
-> The video file is available at: [`References/Demystifying_the_CNN.mp4`](References/Demystifying_the_CNN.mp4)
+> Click the link above, then click "Download" to watch the full video explanation of how Convolutional Neural Networks work.
 
 ---
 
