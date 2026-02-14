@@ -170,9 +170,11 @@ CNNs aren't just for school projects - they power some of the most impressive te
 
 ## Our Project Architecture
 
-We built two models during this project:
+We built two models during this project. Below is the full technical breakdown of every CNN building block — the specific kernels, strides, padding, and how the image dimensions transform at each layer.
 
-### Model 1: Custom CNN (Built from Scratch)
+---
+
+### Model 1: Custom CNN (OddNumberCNN) — Built from Scratch
 
 This is the "learn by building" model that demonstrates core CNN concepts:
 
@@ -180,13 +182,16 @@ This is the "learn by building" model that demonstrates core CNN concepts:
 Input Image (1 x 64 x 64)
     |
     v
-[Conv2d 1->32] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2]  => 32 x 32 x 32
+[Conv2d 1->32, kernel=3x3, stride=1, padding=1] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2]
+    => Output: 32 x 32 x 32
     |
     v
-[Conv2d 32->64] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2]  => 64 x 16 x 16
+[Conv2d 32->64, kernel=3x3, stride=1, padding=1] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2]
+    => Output: 64 x 16 x 16
     |
     v
-[Conv2d 64->128] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2] => 128 x 8 x 8
+[Conv2d 64->128, kernel=3x3, stride=1, padding=1] -> [BatchNorm] -> [ReLU] -> [MaxPool 2x2]
+    => Output: 128 x 8 x 8
     |
     v
 [Flatten] => 8,192 values
@@ -198,7 +203,137 @@ Input Image (1 x 64 x 64)
 [Linear 128->1] => Single number (odd or even?)
 ```
 
-**Result: ~89% accuracy** - Good, but not quite hitting our 90% target.
+**Result: ~89% accuracy** — Good, but not quite hitting our 90% target.
+
+#### Kernels (Filters) — "The Flashlights"
+
+A kernel is a small grid of numbers that slides across the image to detect a specific pattern. Think of it like a stencil — when the stencil matches a shape in the image, the output is high.
+
+| Layer | Kernel Size | Number of Kernels | What They Learn |
+|---|---|---|---|
+| Conv1 | **3x3** (9 values each) | **32 kernels** | Basic features: horizontal lines, vertical lines, edges, corners |
+| Conv2 | **3x3** (9 values each) | **64 kernels** | Mid-level features: curves, angles, loops (parts of digits) |
+| Conv3 | **3x3** (9 values each) | **128 kernels** | High-level features: complete digit shapes, complex patterns |
+
+**Why 3x3?** It's the smallest kernel that can detect a direction (left vs right, up vs down). Larger kernels (like 5x5 or 7x7) see more at once but need more computation. Research has shown that stacking two 3x3 layers gives the same "vision range" as one 5x5 layer, but with fewer parameters and more non-linearity. That's why 3x3 is the modern standard.
+
+**How many total kernels?** 32 + 64 + 128 = **224 different pattern detectors**. The network learned all 224 automatically during training — we didn't design any of them by hand!
+
+**What does a kernel actually look like?** Here's a simplified example of what the learned kernels might detect:
+
+```
+Horizontal edge detector:     Vertical edge detector:     Diagonal detector:
+ [-1  -1  -1]                  [-1   0   1]               [-1  -1   0]
+ [ 0   0   0]                  [-1   0   1]               [-1   0   1]
+ [ 1   1   1]                  [-1   0   1]               [ 0   1   1]
+```
+
+When these slide over an image, they produce high values where the pattern matches and low values where it doesn't.
+
+#### Stride — "How Far the Flashlight Jumps"
+
+Stride controls how many pixels the kernel moves between each calculation.
+
+| Layer | Stride | What This Means |
+|---|---|---|
+| Conv1, Conv2, Conv3 | **stride = 1** | The kernel moves **1 pixel at a time** — it checks every possible position |
+| MaxPool (all 3) | **stride = 2** | The pooling window jumps **2 pixels** — no overlap, halves the dimensions |
+
+**Why stride=1 for convolutions?** Moving 1 pixel at a time gives the finest detail — we don't skip any positions. This means the output feature map has the same width and height as the input (when padding is used).
+
+**Why stride=2 for pooling?** The whole point of pooling is to shrink the data. With a 2x2 window and stride 2, every 4 pixels become 1 pixel, cutting the image size in half.
+
+**Stride = 2 example on a 4x4 grid:**
+```
+Input:              MaxPool 2x2, stride=2:
+[1  3  2  4]
+[5  6  1  2]   =>   [6  4]      (took max of each 2x2 block)
+[3  2  7  8]        [3  9]
+[1  0  3  9]
+```
+
+#### Padding — "Adding a Frame Around the Image"
+
+Padding adds extra pixels (usually zeros) around the border of the image before applying the kernel.
+
+| Layer | Padding | What This Means |
+|---|---|---|
+| Conv1, Conv2, Conv3 | **padding = 1** | 1 row/column of zeros added on all sides |
+| MaxPool (all 3) | **padding = 0** | No padding — feature map shrinks naturally |
+
+**Why padding=1 with a 3x3 kernel?** Without padding, a 3x3 kernel on a 64x64 image would produce a 62x62 output (we lose 1 pixel on each side). With padding=1, we add a 1-pixel border of zeros, making the effective input 66x66, and the 3x3 kernel produces exactly 64x64 — **the size is preserved**!
+
+**The formula:**
+```
+Output Size = (Input Size - Kernel Size + 2 x Padding) / Stride + 1
+
+Without padding: (64 - 3 + 0) / 1 + 1 = 62  (shrinks!)
+With padding=1:  (64 - 3 + 2) / 1 + 1 = 64  (preserved!)
+```
+
+**Why is this important?** Without padding, each conv layer shrinks the image by 2 pixels. After 3 layers, a 64x64 image would become 58x58. With padding, conv layers preserve the size, and only pooling layers do the shrinking (in a controlled way).
+
+#### Dimension Walkthrough — Follow the Image Through the Network
+
+Let's trace exactly how a 64x64 image transforms at every step:
+
+```
+Step 0:  Input                        =>  1 channel  x  64 x 64   (4,096 values)
+         ---
+Step 1a: Conv1 (3x3, stride=1, pad=1) => 32 channels x  64 x 64  (131,072 values)
+Step 1b: BatchNorm + ReLU              => 32 channels x  64 x 64  (same size)
+Step 1c: MaxPool (2x2, stride=2)       => 32 channels x  32 x 32  (32,768 values) ← halved!
+         ---
+Step 2a: Conv2 (3x3, stride=1, pad=1) => 64 channels x  32 x 32  (65,536 values)
+Step 2b: BatchNorm + ReLU              => 64 channels x  32 x 32  (same size)
+Step 2c: MaxPool (2x2, stride=2)       => 64 channels x  16 x 16  (16,384 values) ← halved!
+         ---
+Step 3a: Conv3 (3x3, stride=1, pad=1) => 128 channels x 16 x 16  (32,768 values)
+Step 3b: BatchNorm + ReLU              => 128 channels x 16 x 16  (same size)
+Step 3c: MaxPool (2x2, stride=2)       => 128 channels x  8 x  8  (8,192 values)  ← halved!
+         ---
+Step 4:  Flatten                       => 8,192 (= 128 x 8 x 8)
+Step 5:  FC1 (8192 -> 128) + ReLU      => 128
+Step 6:  Dropout (0.3)                 => 128 (randomly zero-out 30% during training)
+Step 7:  FC2 (128 -> 1)                => 1   (the final logit)
+Step 8:  Sigmoid                       => 1   (probability 0.0 to 1.0)
+```
+
+**Key insight:** The image went from 4,096 raw pixel values to a single number between 0 and 1. If that number is >= 0.5, the model says "odd". If < 0.5, it says "even".
+
+#### BatchNorm — "The Equalizer"
+
+BatchNorm (Batch Normalization) normalizes the values flowing between layers so they have a mean of ~0 and a standard deviation of ~1.
+
+**Why?** Without BatchNorm, the values can grow very large or very small as they pass through layers (this is called "internal covariate shift"). When values get extreme, the gradients (used to update weights) either explode or vanish, making training unstable or very slow.
+
+**Analogy:** Imagine passing notes in class. If each student multiplies the number by 2 before passing it, after 10 students the number is 1,024x bigger! BatchNorm is like a rule that says "reset the number to a reasonable range before passing it on."
+
+#### Dropout (0.3) — "Random Study Group"
+
+During training, Dropout randomly "turns off" 30% of the neurons in the FC layer. This means different neurons must learn independently — no single neuron can carry all the knowledge.
+
+**Why?** Without Dropout, the network might memorize the training images instead of learning general patterns. This is called **overfitting**. Dropout forces the network to spread knowledge across many neurons, making it more robust.
+
+**Analogy:** Instead of one student memorizing the entire textbook, Dropout ensures the whole class learns. Even if some students are absent on test day, the group still passes.
+
+#### Parameter Count
+
+```
+Conv1:    1 x 32 x 3 x 3  =      288 weights + 32 bias  =      320
+BatchNorm1:                          32 + 32               =       64
+Conv2:   32 x 64 x 3 x 3  =   18,432 weights + 64 bias  =   18,496
+BatchNorm2:                          64 + 64               =      128
+Conv3:   64 x 128 x 3 x 3 =   73,728 weights + 128 bias =   73,856
+BatchNorm3:                         128 + 128              =      256
+FC1:     8,192 x 128       = 1,048,576 weights + 128 bias = 1,048,704
+FC2:     128 x 1           =      128 weights + 1 bias    =      129
+                                                    TOTAL: 1,141,953
+```
+
+Over **1 million learnable parameters** — all adjusted automatically during training!
+
+---
 
 ### Model 2: Transfer Learning with ResNet18 (Final Model)
 
@@ -206,7 +341,73 @@ Instead of learning everything from scratch, we used a pre-trained model called 
 
 Think of it like this: instead of teaching a baby to read from zero, we took a college student who already knows how to read English and just taught them to read a new alphabet. Much faster and more accurate!
 
-**Result: 94.61% accuracy** - Well above our 90% target!
+#### ResNet18 Kernel & Layer Details
+
+ResNet18 uses a fundamentally different strategy: **residual connections** (skip connections) that let gradients flow directly through the network, allowing it to be much deeper (18 layers!) without the vanishing gradient problem.
+
+| Stage | Layer | Kernel | Stride | Padding | Channels | Output Size |
+|---|---|---|---|---|---|---|
+| Entry | Conv1 | **7x7** | **2** | 3 | 1 -> 64 | 64 x 32 x 32 |
+| Entry | MaxPool | **3x3** | **2** | 1 | 64 | 64 x 16 x 16 |
+| Layer1 | 2x BasicBlock | **3x3** | **1** | 1 | 64 -> 64 | 64 x 16 x 16 |
+| Layer2 | 2x BasicBlock | **3x3** | **2** then 1 | 1 | 64 -> 128 | 128 x 8 x 8 |
+| Layer3 | 2x BasicBlock | **3x3** | **2** then 1 | 1 | 128 -> 256 | 256 x 4 x 4 |
+| Layer4 | 2x BasicBlock | **3x3** | **2** then 1 | 1 | 256 -> 512 | 512 x 2 x 2 |
+| Exit | AdaptiveAvgPool | — | — | — | 512 | 512 x 1 x 1 |
+| Exit | FC (ours) | — | — | — | 512 -> 1 | 1 |
+
+**Key differences from our custom CNN:**
+
+| Feature | Custom CNN | ResNet18 |
+|---|---|---|
+| First kernel | 3x3 | **7x7** (sees much more context) |
+| Depth | 3 conv layers | **18 layers** (8 BasicBlocks x 2 convs + 2 entry layers) |
+| Total kernels | 224 | **thousands** across all residual blocks |
+| Stride for downsampling | MaxPool only | Stride=2 convolutions + MaxPool |
+| Special feature | — | **Skip connections** (residual learning) |
+| Parameters | 1.14M | **11.17M** (10x more) |
+| Accuracy | ~89% | **94.61%** |
+
+**Why the 7x7 first kernel?** A larger kernel in the first layer captures more global context immediately. It can see a wider area of the image in one look — useful for detecting large features like the overall shape of a digit. Later layers use 3x3 for fine detail.
+
+**What is a BasicBlock (Residual Block)?** It's the magic ingredient of ResNet:
+
+```
+Input ─────────────────────────┐
+  |                             |  (skip connection)
+  v                             |
+[Conv 3x3] -> [BN] -> [ReLU]   |
+  |                             |
+  v                             |
+[Conv 3x3] -> [BN]             |
+  |                             |
+  v                             |
+[  Add input + output  ] <──────┘
+  |
+  v
+[ReLU]
+```
+
+The skip connection means the block only needs to learn the *difference* from its input. If the block can't improve the prediction, the input passes through unchanged (it learns "do nothing"). This makes very deep networks possible — without skip connections, 18 layers would be too deep to train.
+
+#### Our Adaptation for Grayscale
+
+ResNet18 was designed for 3-channel RGB images. Our images are 1-channel grayscale. We adapted the first conv layer:
+
+- **Original:** `Conv2d(3, 64, kernel_size=7, stride=2, padding=3)`
+- **Our version:** `Conv2d(1, 64, kernel_size=7, stride=2, padding=3)`
+- **Weight transfer:** We averaged the 3 RGB kernel channels into 1 grayscale channel, preserving the pre-trained knowledge.
+
+**Result: 94.61% accuracy** — Well above our 90% target!
+
+#### Why Transfer Learning Won
+
+| Factor | Custom CNN | TransferCNN |
+|---|---|---|
+| Starting point | Random weights | Pre-trained on 1.2M ImageNet images |
+| Edge/shape detection | Must learn from scratch with 1,925 images | Already knows edges, textures, shapes |
+| Training needed | Many epochs to learn basics | Only fine-tuning for our specific task |
+| Generalization | Limited by small dataset | Rich feature representations generalize well |
 
 ---
 
