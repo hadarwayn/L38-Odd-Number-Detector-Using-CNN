@@ -1,0 +1,45 @@
+# Secrets & API Keys
+.env
+*.key
+*.pem
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.uv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs (keep config, not actual logs)
+logs/*.log
+!logs/config/
+!logs/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model weights (large file, optional to exclude)
+# results/model.pth

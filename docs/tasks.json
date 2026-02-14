@@ -1,0 +1,403 @@
+{
+  "project_name": "L38-cnn-odd-number-detector",
+  "version": "2.0",
+  "total_estimated_hours": 8.5,
+  "phases": [
+    {
+      "phase": "1_setup",
+      "phase_name": "Project Setup & Environment",
+      "estimated_hours": 1.0,
+      "tasks": [
+        {
+          "id": "1.1",
+          "name": "Create directory structure",
+          "description": "Create the complete project folder tree: src/, docs/, results/graphs/, logs/config/, input/positive/, input/negative/, venv/",
+          "priority": "critical",
+          "estimated_hours": 0.25,
+          "dependencies": [],
+          "files_to_create": [
+            "src/__init__.py",
+            "docs/PRD.md",
+            "docs/tasks.json",
+            "results/graphs/.gitkeep",
+            "logs/config/log_config.json",
+            "logs/.gitkeep",
+            "venv/.gitkeep"
+          ],
+          "acceptance_criteria": [
+            "All directories exist",
+            "All __init__.py files present",
+            ".gitkeep files in empty directories"
+          ]
+        },
+        {
+          "id": "1.2",
+          "name": "Create requirements.txt",
+          "description": "List all dependencies with exact pinned versions: torch, torchvision, numpy, matplotlib, Pillow, scikit-learn",
+          "priority": "critical",
+          "estimated_hours": 0.15,
+          "dependencies": ["1.1"],
+          "files_to_create": ["requirements.txt"],
+          "acceptance_criteria": [
+            "All packages listed with ==version format",
+            "uv pip install -r requirements.txt succeeds"
+          ]
+        },
+        {
+          "id": "1.3",
+          "name": "Create .gitignore",
+          "description": "Configure git to exclude: .venv/, __pycache__/, *.pyc, logs/*.log, results/model.pth (optional), .env",
+          "priority": "high",
+          "estimated_hours": 0.1,
+          "dependencies": ["1.1"],
+          "files_to_create": [".gitignore"],
+          "acceptance_criteria": [
+            "Virtual environment excluded",
+            "Cache files excluded",
+            "Log files excluded (but config kept)"
+          ]
+        },
+        {
+          "id": "1.4",
+          "name": "Set up UV virtual environment",
+          "description": "Create virtual environment with uv venv, activate it, install all dependencies",
+          "priority": "critical",
+          "estimated_hours": 0.25,
+          "dependencies": ["1.2"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "uv venv creates .venv/ directory",
+            "All packages install successfully",
+            "python -c 'import torch; print(torch.__version__)' works"
+          ]
+        },
+        {
+          "id": "1.5",
+          "name": "Verify dataset in input/ folder",
+          "description": "Confirm 2,407 images present in flat input/ directory: 1,207 with prefix include-odd-numbers and 1,200 with prefix include-even-numbers. Print counts.",
+          "priority": "critical",
+          "estimated_hours": 0.25,
+          "dependencies": ["1.1"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "Odd-prefix files: 1,207 images confirmed",
+            "Even-prefix files: 1,200 images confirmed",
+            "Total: 2,407 images",
+            "All images readable as grayscale"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "2_data_loading",
+      "phase_name": "Data Loading & Preprocessing",
+      "estimated_hours": 1.5,
+      "tasks": [
+        {
+          "id": "2.1",
+          "name": "Implement data_loader.py",
+          "description": "Create the data loading module: scan flat input/ directory, determine labels from filename prefix (include-odd-numbers → 1, include-even-numbers → 0), load images with Pillow, convert to grayscale, resize to 64x64, normalize to [0,1], create stratified train/test split (80/20), wrap in PyTorch DataLoaders.",
+          "priority": "critical",
+          "estimated_hours": 1.0,
+          "dependencies": ["1.4", "1.5"],
+          "files_to_create": ["src/data_loader.py"],
+          "acceptance_criteria": [
+            "All 2,407 images loaded successfully",
+            "Corrupt/unreadable images skipped with warning",
+            "Tensors have shape (N, 1, 64, 64)",
+            "Pixel values in [0.0, 1.0] range",
+            "Train/test split is stratified",
+            "DataLoaders iterate correctly",
+            "File ≤ 150 lines"
+          ]
+        },
+        {
+          "id": "2.2",
+          "name": "Test data loading pipeline",
+          "description": "Verify data loader outputs: correct shapes, correct label counts, batch iteration works, print dataset summary statistics.",
+          "priority": "high",
+          "estimated_hours": 0.5,
+          "dependencies": ["2.1"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "Batch shape prints correctly: (32, 1, 64, 64)",
+            "Labels are 0s and 1s only",
+            "Class balance roughly maintained in both splits",
+            "Summary prints total/train/test counts"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "3_model",
+      "phase_name": "CNN Model Architecture",
+      "estimated_hours": 1.0,
+      "tasks": [
+        {
+          "id": "3.1",
+          "name": "Implement model.py — CNN architecture",
+          "description": "Define the OddNumberCNN class inheriting from nn.Module. Architecture: Conv2d(1→16, 3×3) → ReLU → MaxPool(2×2) → Conv2d(16→32, 3×3) → ReLU → MaxPool(2×2) → Flatten → Linear(8192→64) → ReLU → Linear(64→1). Include model summary method that prints layer shapes.",
+          "priority": "critical",
+          "estimated_hours": 0.75,
+          "dependencies": ["1.4"],
+          "files_to_create": ["src/model.py"],
+          "acceptance_criteria": [
+            "Model inherits from nn.Module",
+            "Forward pass accepts (batch, 1, 64, 64) input",
+            "Output shape is (batch, 1)",
+            "Model summary prints all layer dimensions",
+            "Every layer has educational comment mapping to Lesson 38",
+            "File ≤ 150 lines"
+          ]
+        },
+        {
+          "id": "3.2",
+          "name": "Verify model with dummy input",
+          "description": "Pass a random tensor of shape (1, 1, 64, 64) through the model to verify all dimensions match and output is correct shape.",
+          "priority": "high",
+          "estimated_hours": 0.25,
+          "dependencies": ["3.1"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "No dimension mismatch errors",
+            "Output is single value per sample",
+            "Model parameter count is reasonable (< 1M parameters)"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "4_training",
+      "phase_name": "Training Loop & Validation",
+      "estimated_hours": 1.5,
+      "tasks": [
+        {
+          "id": "4.1",
+          "name": "Implement trainer.py — training loop",
+          "description": "Create train_model() function: iterate over epochs, for each epoch iterate over batches, perform forward pass, compute BCEWithLogitsLoss, backpropagate, update with Adam optimizer. Track loss per epoch. After each epoch, run validation to compute test accuracy. Return training history dict.",
+          "priority": "critical",
+          "estimated_hours": 1.0,
+          "dependencies": ["2.1", "3.1"],
+          "files_to_create": ["src/trainer.py"],
+          "acceptance_criteria": [
+            "Training loop runs for configured epochs",
+            "Loss decreases over epochs",
+            "Validation accuracy computed each epoch",
+            "Progress printed: epoch, loss, accuracy",
+            "Training history returned as dict",
+            "Model weights saved to results/model.pth",
+            "File ≤ 150 lines"
+          ]
+        },
+        {
+          "id": "4.2",
+          "name": "Run initial training test (3 epochs)",
+          "description": "Quick smoke test: train for 3 epochs to verify the entire pipeline works end-to-end before full training.",
+          "priority": "high",
+          "estimated_hours": 0.5,
+          "dependencies": ["4.1"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "No errors during 3-epoch training",
+            "Loss decreases (even slightly)",
+            "Accuracy improves from random (50%)",
+            "Model.pth file created"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "5_evaluation",
+      "phase_name": "Model Evaluation & Metrics",
+      "estimated_hours": 1.0,
+      "tasks": [
+        {
+          "id": "5.1",
+          "name": "Implement evaluator.py — evaluation module",
+          "description": "Create evaluate_model() function: run trained model on full test set, compute accuracy, precision, recall, F1-score, and confusion matrix. Save results to results/training_log.json.",
+          "priority": "high",
+          "estimated_hours": 0.75,
+          "dependencies": ["4.1"],
+          "files_to_create": ["src/evaluator.py"],
+          "acceptance_criteria": [
+            "Accuracy calculated correctly",
+            "Confusion matrix generated (TP, TN, FP, FN)",
+            "Precision, recall, F1 computed",
+            "Results saved as JSON",
+            "File ≤ 150 lines"
+          ]
+        },
+        {
+          "id": "5.2",
+          "name": "Run full evaluation on test set",
+          "description": "After full training (15 epochs), evaluate on test set and verify accuracy > 90%.",
+          "priority": "high",
+          "estimated_hours": 0.25,
+          "dependencies": ["5.1", "4.2"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "Test accuracy > 90%",
+            "Metrics printed clearly",
+            "Results JSON saved"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "6_visualization",
+      "phase_name": "Results Visualization",
+      "estimated_hours": 1.5,
+      "tasks": [
+        {
+          "id": "6.1",
+          "name": "Implement visualizer.py — all plots",
+          "description": "Create visualization functions: (1) plot_loss_curve — training loss vs. epoch, (2) plot_accuracy_curve — validation accuracy vs. epoch, (3) plot_prediction_grid — 4×4 grid showing test images with predicted vs. actual labels (green=correct, red=wrong), (4) plot_confusion_matrix — heatmap of TP/TN/FP/FN, (5) plot_sample_images — example images from each class.",
+          "priority": "high",
+          "estimated_hours": 1.0,
+          "dependencies": ["5.1"],
+          "files_to_create": ["src/visualizer.py"],
+          "acceptance_criteria": [
+            "All 5 plot functions work",
+            "Graphs have clear titles, labels, annotations",
+            "Prediction grid uses green/red color coding",
+            "All images saved to results/graphs/ at 300 DPI",
+            "File ≤ 150 lines"
+          ]
+        },
+        {
+          "id": "6.2",
+          "name": "Generate all visualizations",
+          "description": "Run all visualization functions and verify the 5 output PNG files are generated correctly in results/graphs/.",
+          "priority": "high",
+          "estimated_hours": 0.5,
+          "dependencies": ["6.1", "5.2"],
+          "files_to_create": [
+            "results/graphs/loss_curve.png",
+            "results/graphs/accuracy_curve.png",
+            "results/graphs/prediction_grid.png",
+            "results/graphs/confusion_matrix.png",
+            "results/graphs/sample_images.png"
+          ],
+          "acceptance_criteria": [
+            "All 5 PNG files exist in results/graphs/",
+            "Images are clear and readable",
+            "Loss curve shows downward trend",
+            "Prediction grid shows mostly correct predictions"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "7_main_entry",
+      "phase_name": "Main Entry Point",
+      "estimated_hours": 0.5,
+      "tasks": [
+        {
+          "id": "7.1",
+          "name": "Implement main.py — orchestrator",
+          "description": "Create single entry point that runs the complete pipeline in order: (1) Print welcome banner, (2) Load dataset, (3) Print dataset summary, (4) Build CNN model + print architecture, (5) Train model, (6) Evaluate on test set, (7) Generate all visualizations, (8) Print final summary with results location. Include argparse for optional --epochs and --batch-size flags.",
+          "priority": "critical",
+          "estimated_hours": 0.5,
+          "dependencies": ["2.1", "3.1", "4.1", "5.1", "6.1"],
+          "files_to_create": ["main.py"],
+          "acceptance_criteria": [
+            "python main.py runs the entire pipeline",
+            "Clear progress messages at each step",
+            "Final summary shows accuracy and output locations",
+            "Optional args: --epochs, --batch-size",
+            "File ≤ 150 lines"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "8_documentation",
+      "phase_name": "Documentation & README",
+      "estimated_hours": 1.5,
+      "tasks": [
+        {
+          "id": "8.1",
+          "name": "Write comprehensive README.md",
+          "description": "Create the project showcase README following PROJECT_GUIDELINES.md standards. Must include: project title + abstract, CNN concept explanations with Lesson 38 analogies, dataset description (3 sources, 2407 images), architecture diagram in text, installation instructions (UV), how to run, project structure tree, code files table with line counts, results section with embedded graphs, learning demonstration section, troubleshooting.",
+          "priority": "high",
+          "estimated_hours": 1.0,
+          "dependencies": ["6.2", "7.1"],
+          "files_to_create": ["README.md"],
+          "acceptance_criteria": [
+            "All PROJECT_GUIDELINES sections present",
+            "CNN concepts explained with 15-year-old-friendly analogies",
+            "Dataset sources documented (Gemini, MNIST, SVHN)",
+            "All result images embedded with explanations",
+            "Installation works following README steps",
+            "Code files table with accurate line counts"
+          ]
+        },
+        {
+          "id": "8.2",
+          "name": "Final testing — clean run",
+          "description": "Delete any cached results. Run python main.py from scratch to verify the entire pipeline works end-to-end. Verify all output files are generated.",
+          "priority": "critical",
+          "estimated_hours": 0.5,
+          "dependencies": ["8.1"],
+          "files_to_create": [],
+          "acceptance_criteria": [
+            "Clean run completes without errors",
+            "All 5 visualizations generated",
+            "Accuracy > 90%",
+            "README images point to correct paths",
+            "Project ready for GitHub upload"
+          ]
+        }
+      ]
+    }
+  ],
+  "file_structure": {
+    "root": [
+      "README.md",
+      "main.py",
+      "requirements.txt",
+      ".gitignore"
+    ],
+    "src": [
+      "__init__.py",
+      "data_loader.py",
+      "model.py",
+      "trainer.py",
+      "evaluator.py",
+      "visualizer.py"
+    ],
+    "docs": [
+      "PRD.md",
+      "tasks.json"
+    ],
+    "results": [
+      "graphs/loss_curve.png",
+      "graphs/accuracy_curve.png",
+      "graphs/prediction_grid.png",
+      "graphs/confusion_matrix.png",
+      "graphs/sample_images.png",
+      "model.pth",
+      "training_log.json"
+    ],
+    "input": [
+      "include-odd-numbers-*.png/jpg (1,207 images)",
+      "include-even-numbers-*.png/jpg (1,200 images)"
+    ],
+    "logs": [
+      "config/log_config.json",
+      ".gitkeep"
+    ],
+    "venv": [
+      ".gitkeep"
+    ]
+  },
+  "dependency_graph": {
+    "description": "Task execution order based on dependencies",
+    "critical_path": "1.1 → 1.2 → 1.4 → 2.1 → 4.1 → 5.1 → 6.1 → 7.1 → 8.1 → 8.2",
+    "parallel_possible": [
+      ["1.2", "1.3", "1.5"],
+      ["2.1", "3.1"],
+      ["5.1", "6.1"]
+    ]
+  }
+}
